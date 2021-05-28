@@ -96,7 +96,7 @@ class KalmanBoxTracker(object):
   This class represents the internal state of individual tracked objects observed as bbox.
   """
   count = 0
-  def __init__(self,bbox):
+  def __init__(self, bbox):
     """
     Initialises a tracker using initial bounding box.
     """
@@ -112,6 +112,7 @@ class KalmanBoxTracker(object):
     self.kf.Q[4:,4:] *= 0.01
 
     self.kf.x[:4] = convert_bbox_to_z(bbox)
+    self.other_params = bbox[5:]
     self.time_since_update = 0
     self.id = KalmanBoxTracker.count
     KalmanBoxTracker.count += 1
@@ -129,6 +130,7 @@ class KalmanBoxTracker(object):
     self.hits += 1
     self.hit_streak += 1
     self.kf.update(convert_bbox_to_z(bbox))
+    self.other_params = bbox[5:]
 
   def predict(self):
     """
@@ -148,7 +150,7 @@ class KalmanBoxTracker(object):
     """
     Returns the current bounding box estimate.
     """
-    return convert_x_to_bbox(self.kf.x)
+    return convert_x_to_bbox(self.kf.x), self.other_params
 
 
 def associate_detections_to_trackers(detections,trackers,iou_threshold = 0.3):
@@ -241,9 +243,10 @@ class Sort(object):
         self.trackers.append(trk)
     i = len(self.trackers)
     for trk in reversed(self.trackers):
-        d = trk.get_state()[0]
+        d, other = trk.get_state()
+        d = d[0]
         if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-          ret.append(np.concatenate((d,[trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          ret.append(np.concatenate((d,[trk.id+1], other)).reshape(1,-1))  # +1 as MOT benchmark requires positive
         i -= 1
         # remove dead tracklet
         if(trk.time_since_update > self.max_age):
